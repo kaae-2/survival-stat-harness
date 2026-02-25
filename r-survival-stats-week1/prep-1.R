@@ -149,4 +149,7 @@ GBSG2$grouptsize_big <- factor(
 out=survdiff(Surv(time,cens)~grouptsize_big, data=GBSG2)
 out
 
+fit <- survfit(Surv(years, cens) ~ grouptsize, data = GBSG2)
+
+summary(fit, times = 5)
 # DONE

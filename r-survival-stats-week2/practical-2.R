@@ -23,19 +23,18 @@ bissau <- read.csv2("http://biostat.ku.dk/frank/data/bissau.csv")
 # 1. Make a Kaplan-Meier plot for children with (DTP>0) and without (DTP=0).
 # Use time on study as time scale (time from first visit).
 # Calculate the survival probability at time 180 days after first visit.
-bissau$dtpcat <- bissau$dtp>0
+bissau$dtpcat <- 1* (bissau$dtp>0)
 bissau <- transform(bissau, outage = age+fuptime, inage=age)
 
 out=survfit(Surv(fuptime, dead) ~dtpcat, data=bissau)
 plot(out, mark.time=TRUE)
-kmplot(out)
-title(main="Kaplan-Meyer Plot of DTP>1 vs DTP=0 for bissau")
+kmplot(out, ylim=c(0.85,1.0))
+title(main="Kaplan-Meyer Plot of DTP>1 vs DTP=0 for bissau by time of inclusion")
 
-out=prodlim(Surv(fuptime, dead) ~dtpcat, data=bissau)
-survvals <- round(summary(sfit)$surv, 2)
-ylim <- range(survvals, na.rm=TRUE)
-plot(out, ylim=ylim, mark.time=TRUE)
-title(main="Kaplan-Meyer Plot of DTP>1 vs DTP=0 for bissau")
+out=prodlim(Surv(inage, outage, dead) ~dtpcat, data=bissau)
+ylim <- c(0.85,1.0)
+plot(out, ylim=ylim, marktime=TRUE, legend="bottom-right")
+title(main="Kaplan-Meyer Plot of DTP>1 vs DTP=0 for bissau by age of child")
 
 summary(out, times=180)
 # 2.Test if having received a DTP dose is good by a Cox model. Write a conclusion sentence.
@@ -63,3 +62,4 @@ summary(cox)
 cox <- coxph(Surv(inage, outage, dead) ~dtpcat+bcg, data=bissau)
 summary(cox)
 # with age as time-scale, the p-value increases significantly to >10%, so we cannot disregard the null hypothesis when comparing by age
+

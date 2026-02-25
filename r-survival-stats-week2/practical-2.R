@@ -27,8 +27,8 @@ bissau$dtpcat <- 1* (bissau$dtp>0)
 bissau <- transform(bissau, outage = age+fuptime, inage=age)
 
 out=survfit(Surv(fuptime, dead) ~dtpcat, data=bissau)
-plot(out, mark.time=TRUE)
-kmplot(out, ylim=c(0.85,1.0))
+#plot(out, mark.time=TRUE)
+kmplot(out, ylim=c(0.95,1.0), mark.time=TRUE)
 title(main="Kaplan-Meyer Plot of DTP>1 vs DTP=0 for bissau by time of inclusion")
 
 out=prodlim(Surv(inage, outage, dead) ~dtpcat, data=bissau)

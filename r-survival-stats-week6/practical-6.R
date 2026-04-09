@@ -69,7 +69,9 @@ summary(pla, times=2000)
 # way to get the same numbers is to use the predict function
 # ## chemo=1
 nd1 <- data.frame(expand.grid(chemo=factor(1), size=c("<=20",">50","20-50")))
-predict(pla, newdata=nd1, times=2000)
+pred1 <-predict(pla, newdata=nd1, times=2000)
+pred1
+
 # ## $`chemo=1, size=<=20`
 # ## [1] 0.6191715
 # ##
@@ -80,7 +82,8 @@ predict(pla, newdata=nd1, times=2000)
 # ## [1] 0.4641005
 # ## chemo=0
 nd0 <- data.frame(expand.grid(chemo=factor(0), size=c("<=20",">50","20-50")))
-predict(pla, newdata=nd0, times=2000)
+pred0 <- predict(pla, newdata=nd0, times=2000)
+pred0
 # 2
 # ## $`chemo=0, size=<=20`
 # ## [1] 0.3380682
@@ -130,8 +133,8 @@ n <- sum(ngr)
 # You may do this “manually” by copy+paste (it can also be done directly in R). Redo the
 # procedure for the no chemotherapy group. Look at the difference between the weighted
 # averages. Compare this to the estimates and difference from question 1. Interpret.
-weighted.mean(unlist(predict(pla, newdata = nd1, times = 2000)), ngr)
-weighted.mean(unlist(predict(pla, newdata = nd0, times = 2000)), ngr)
+weighted.mean(unlist(pred1), ngr)
+weighted.mean(unlist(pred0), ngr)
 # [1] 0.4957646
 # [1] 0.2493604
 # 3

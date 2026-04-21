@@ -30,5 +30,7 @@ load_dataset <- function() {
   
   df <- dplyr::left_join(df, date_df, by = "id")
   
+  df$included <- NULL
+  
   df
 }

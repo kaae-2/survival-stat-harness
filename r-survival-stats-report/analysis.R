@@ -33,7 +33,7 @@
 # --- setup / report scaffolding ---
 # Use explicit namespace calls so rerunning the script is idempotent and does
 # not depend on the current attached package state.
-required_packages <- c("dplyr", "survival", "prodlim", "cmprsk", "mets")
+required_packages <- c("survival", "prodlim", "cmprsk", "mets")
 missing_packages <- required_packages[
   !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
 ]
@@ -58,7 +58,7 @@ df <- pipeline_env$load_dataset()
 # --- 0.2 and 0.4 clean and transform the analysis dataset ---
 # Keep the original loaded object untouched and prepare a separate analysis data
 # frame with labels and convenience variables used in several downstream blocks.
-analysis_df <- dplyr::mutate(
+analysis_df <- transform(
   df,
   sex = factor(sex),
   risk_grp = factor(risk_grp),
@@ -66,15 +66,15 @@ analysis_df <- dplyr::mutate(
   totalyears = totaldays / 365.25,
   compriskyears = compriskdays / 365.25,
   log_lymf_count = ifelse(is.na(lymf_count), NA_real_, log1p(pmax(lymf_count, 0))),
-  sct_by_landmark = dplyr::case_when(
-    is.na(landmark_date) ~ NA_character_,
-    !is.na(sct_date) & sct_date <= landmark_date ~ "SCT by landmark",
-    TRUE ~ "No SCT by landmark"
-  ),
-  sct_by_landmark = factor(
-    sct_by_landmark,
-    levels = c("No SCT by landmark", "SCT by landmark")
+  sct_by_landmark = ifelse(
+    is.na(landmark_date),
+    NA_character_,
+    ifelse(!is.na(sct_date) & sct_date <= landmark_date, "SCT by landmark", "No SCT by landmark")
   )
+)
+analysis_df$sct_by_landmark <- factor(
+  analysis_df$sct_by_landmark,
+  levels = c("No SCT by landmark", "SCT by landmark")
 )
 
 # --- 0.3 cohort summaries for the report ---
@@ -87,46 +87,49 @@ analysis_cohort_summary <- data.frame(
   n_smn = sum(analysis_df$comprisk == 3, na.rm = TRUE)
 )
 
-analysis_baseline_by_risk_group <- dplyr::summarise(
-  dplyr::group_by(analysis_df, risk_grp),
-    n = dplyr::n(),
-    n_events = sum(event == 1, na.rm = TRUE),
-    n_relapse = sum(comprisk == 1, na.rm = TRUE),
-    n_death = sum(comprisk == 2, na.rm = TRUE),
-    n_smn = sum(comprisk == 3, na.rm = TRUE),
-    median_age = stats::median(age, na.rm = TRUE),
-    q1_age = stats::quantile(age, probs = 0.25, na.rm = TRUE),
-    q3_age = stats::quantile(age, probs = 0.75, na.rm = TRUE),
-    median_lymf_count = stats::median(lymf_count, na.rm = TRUE),
-    median_followup_days = stats::median(totaldays, na.rm = TRUE),
-    .groups = "drop"
-  )
+analysis_risk_levels <- levels(analysis_df$risk_grp)
+analysis_baseline_by_risk_group <- data.frame(
+  risk_grp = analysis_risk_levels,
+  n = as.integer(table(analysis_df$risk_grp)[analysis_risk_levels]),
+  n_events = as.numeric(tapply(analysis_df$event == 1, analysis_df$risk_grp, sum, na.rm = TRUE)[analysis_risk_levels]),
+  n_relapse = as.numeric(tapply(analysis_df$comprisk == 1, analysis_df$risk_grp, sum, na.rm = TRUE)[analysis_risk_levels]),
+  n_death = as.numeric(tapply(analysis_df$comprisk == 2, analysis_df$risk_grp, sum, na.rm = TRUE)[analysis_risk_levels]),
+  n_smn = as.numeric(tapply(analysis_df$comprisk == 3, analysis_df$risk_grp, sum, na.rm = TRUE)[analysis_risk_levels]),
+  median_age = as.numeric(tapply(analysis_df$age, analysis_df$risk_grp, stats::median, na.rm = TRUE)[analysis_risk_levels]),
+  q1_age = as.numeric(tapply(analysis_df$age, analysis_df$risk_grp, stats::quantile, probs = 0.25, na.rm = TRUE)[analysis_risk_levels]),
+  q3_age = as.numeric(tapply(analysis_df$age, analysis_df$risk_grp, stats::quantile, probs = 0.75, na.rm = TRUE)[analysis_risk_levels]),
+  median_lymf_count = as.numeric(tapply(analysis_df$lymf_count, analysis_df$risk_grp, stats::median, na.rm = TRUE)[analysis_risk_levels]),
+  median_followup_days = as.numeric(tapply(analysis_df$totaldays, analysis_df$risk_grp, stats::median, na.rm = TRUE)[analysis_risk_levels])
+)
+analysis_baseline_dtable <- mets::dtable(analysis_df, ~ risk_grp + sex, level = 1)
 
 analysis_helpers$save_csv(analysis_cohort_summary, "cohort_summary.csv")
 analysis_helpers$save_csv(analysis_baseline_by_risk_group, "baseline_by_risk_group.csv")
+analysis_helpers$save_text(capture.output(analysis_baseline_dtable), "baseline_dtable.txt")
 
 # --- 1.3 and 1.6 overall event-free survival and significance testing ---
 # This follows the standard course workflow: non-parametric curves first, then
 # log-rank testing, then an adjusted Cox model.
-overall_km_df <- dplyr::filter(
+overall_km_df <- subset(
   analysis_df,
-  !is.na(days),
-  !is.na(event),
-  !is.na(risk_grp)
+  !is.na(days) & !is.na(event) & !is.na(risk_grp)
 )
 
-overall_model_df <- dplyr::filter(
+overall_model_df <- subset(
   overall_km_df,
-  !is.na(sex),
-  !is.na(age),
-  !is.na(log_lymf_count)
+  !is.na(sex) & !is.na(age) & !is.na(log_lymf_count)
 )
 
 overall_report_times_days <- report_times_days[
   report_times_days <= max(overall_km_df$days, na.rm = TRUE)
 ]
 
-overall_km_fit <- survival::survfit(
+overall_km_fit <- prodlim::prodlim(
+  survival::Surv(days, event) ~ risk_grp,
+  data = overall_km_df
+)
+
+overall_cumhaz_fit <- survival::survfit(
   survival::Surv(days, event) ~ risk_grp,
   data = overall_km_df
 )
@@ -142,7 +145,7 @@ overall_adjusted_cox_fit <- survival::coxph(
   x = TRUE
 )
 
-overall_event_free_summary <- analysis_helpers$extract_surv_summary(
+overall_event_free_summary <- analysis_helpers$extract_prodlim_summary(
   overall_km_fit,
   overall_report_times_days
 )
@@ -159,7 +162,7 @@ analysis_helpers$save_plot_png("overall_km_by_risk_group.png", function() {
   group_levels <- levels(overall_km_df$risk_grp)
   group_cols <- seq_along(group_levels)
 
-  graphics::plot(
+  plot(
     overall_km_fit,
     col = group_cols,
     lty = 1,
@@ -181,7 +184,7 @@ analysis_helpers$save_plot_png("overall_cumulative_hazard_by_risk_group.png", fu
   group_cols <- seq_along(group_levels)
 
   graphics::plot(
-    overall_km_fit,
+    overall_cumhaz_fit,
     fun = "cumhaz",
     col = group_cols,
     lty = 1,
@@ -201,11 +204,9 @@ analysis_helpers$save_plot_png("overall_cumulative_hazard_by_risk_group.png", fu
 # --- 1.1 competing risks ---
 # This mirrors the course examples: non-parametric cumulative incidence curves,
 # Gray's test, and then cause-specific Cox models for the main event types.
-competing_risk_df <- dplyr::filter(
+competing_risk_df <- subset(
   analysis_df,
-  !is.na(compriskdays),
-  !is.na(comprisk),
-  !is.na(risk_grp)
+  !is.na(compriskdays) & !is.na(comprisk) & !is.na(risk_grp)
 )
 
 competing_risk_report_times_days <- report_times_days[
@@ -227,10 +228,14 @@ competing_risk_gray_fit <- cmprsk::cuminc(
 competing_risk_gray_tests <- as.data.frame(competing_risk_gray_fit$Tests)
 competing_risk_gray_tests$comparison <- rownames(competing_risk_gray_tests)
 rownames(competing_risk_gray_tests) <- NULL
+competing_risk_gray_timepoints <- analysis_helpers$extract_cuminc_timepoints(
+  competing_risk_gray_fit,
+  competing_risk_report_times_days
+)
 
-competing_risk_relapse_summary <- summary(competing_risk_cif_fit, times = competing_risk_report_times_days, cause = 1)
-competing_risk_death_summary <- summary(competing_risk_cif_fit, times = competing_risk_report_times_days, cause = 2)
-competing_risk_smn_summary <- summary(competing_risk_cif_fit, times = competing_risk_report_times_days, cause = 3)
+competing_risk_relapse_summary <- analysis_helpers$extract_prodlim_summary(competing_risk_cif_fit, competing_risk_report_times_days, cause = 1)
+competing_risk_death_summary <- analysis_helpers$extract_prodlim_summary(competing_risk_cif_fit, competing_risk_report_times_days, cause = 2)
+competing_risk_smn_summary <- analysis_helpers$extract_prodlim_summary(competing_risk_cif_fit, competing_risk_report_times_days, cause = 3)
 
 competing_risk_relapse_cox_fit <- analysis_helpers$fit_cause_specific_cox(analysis_df, 1)
 competing_risk_death_cox_fit <- analysis_helpers$fit_cause_specific_cox(analysis_df, 2)
@@ -241,6 +246,7 @@ competing_risk_death_cox_table <- analysis_helpers$extract_cox_table(competing_r
 competing_risk_smn_cox_table <- analysis_helpers$extract_cox_table(competing_risk_smn_cox_fit)
 
 analysis_helpers$save_csv(competing_risk_gray_tests, "competing_risk_gray_tests.csv")
+analysis_helpers$save_csv(competing_risk_gray_timepoints, "competing_risk_gray_timepoints.csv")
 analysis_helpers$save_csv(competing_risk_relapse_cox_table, "competing_risk_relapse_cox_table.csv")
 analysis_helpers$save_text(capture.output(summary(competing_risk_relapse_cox_fit)), "competing_risk_relapse_cox_summary.txt")
 analysis_helpers$save_csv(competing_risk_death_cox_table, "competing_risk_death_cox_table.csv")
@@ -279,16 +285,13 @@ analysis_helpers$save_plot_png("competing_risk_cif_by_risk_group.png", function(
 # --- 1.2 landmark analysis for SCT ---
 # Patients are classified by SCT status at the landmark date and then followed
 # from the landmark onward. This avoids using future SCT information at baseline.
-landmark_source_df <- dplyr::filter(
+landmark_source_df <- subset(
   analysis_df,
-  !is.na(landmark_date),
-  !is.na(date),
-  !is.na(event),
-  !is.na(sct_by_landmark)
+  !is.na(landmark_date) & !is.na(date) & !is.na(event) & !is.na(sct_by_landmark)
 )
 
-landmark_analysis_df <- dplyr::mutate(
-  dplyr::filter(landmark_source_df, date > landmark_date),
+landmark_analysis_df <- transform(
+  subset(landmark_source_df, date > landmark_date),
   time_from_landmark = as.numeric(date - landmark_date),
   event_from_landmark = event
 )
@@ -309,17 +312,14 @@ landmark_group_counts <- data.frame(
 landmark_sct_counts <- as.data.frame(table(landmark_analysis_df$sct_by_landmark, useNA = "ifany"))
 names(landmark_sct_counts) <- c("sct_by_landmark", "n")
 
-landmark_km_fit <- survival::survfit(
+landmark_km_fit <- prodlim::prodlim(
   survival::Surv(time_from_landmark, event_from_landmark) ~ sct_by_landmark,
   data = landmark_analysis_df
 )
 
-landmark_model_df <- dplyr::filter(
+landmark_model_df <- subset(
   landmark_analysis_df,
-  !is.na(risk_grp),
-  !is.na(sex),
-  !is.na(age),
-  !is.na(log_lymf_count)
+  !is.na(risk_grp) & !is.na(sex) & !is.na(age) & !is.na(log_lymf_count)
 )
 
 landmark_adjusted_cox_fit <- survival::coxph(
@@ -332,7 +332,7 @@ landmark_report_times_days <- report_times_days[
   report_times_days <= max(landmark_analysis_df$time_from_landmark, na.rm = TRUE)
 ]
 
-landmark_event_free_summary <- analysis_helpers$extract_surv_summary(landmark_km_fit, landmark_report_times_days)
+landmark_event_free_summary <- analysis_helpers$extract_prodlim_summary(landmark_km_fit, landmark_report_times_days)
 
 landmark_adjusted_cox_table <- analysis_helpers$extract_cox_table(landmark_adjusted_cox_fit)
 
@@ -347,7 +347,7 @@ analysis_helpers$save_plot_png("landmark_km_by_sct_status.png", function() {
   sct_levels <- levels(landmark_analysis_df$sct_by_landmark)
   sct_cols <- seq_along(sct_levels)
 
-  graphics::plot(
+  plot(
     landmark_km_fit,
     col = sct_cols,
     lty = 1,
@@ -375,10 +375,13 @@ overall_rmst_fit <- survival::survfit(
 
 overall_rmst_table <- analysis_helpers$extract_rmst_table(overall_rmst_fit, rmst_tau_days)
 
-competing_risk_time_lost_table <- dplyr::bind_rows(
-  analysis_helpers$extract_time_lost_by_cause(competing_risk_df, rmst_tau_days, 1, "Relapse"),
-  analysis_helpers$extract_time_lost_by_cause(competing_risk_df, rmst_tau_days, 2, "Death"),
-  analysis_helpers$extract_time_lost_by_cause(competing_risk_df, rmst_tau_days, 3, "SMN")
+competing_risk_time_lost_table <- do.call(
+  rbind,
+  list(
+    analysis_helpers$extract_time_lost_by_cause(competing_risk_df, rmst_tau_days, 1, "Relapse"),
+    analysis_helpers$extract_time_lost_by_cause(competing_risk_df, rmst_tau_days, 2, "Death"),
+    analysis_helpers$extract_time_lost_by_cause(competing_risk_df, rmst_tau_days, 3, "SMN")
+  )
 )
 
 analysis_helpers$save_csv(overall_rmst_table, "overall_rmst_table.csv")
@@ -456,6 +459,7 @@ analysis_outputs <- list(
     cif_fit = competing_risk_cif_fit,
     gray_fit = competing_risk_gray_fit,
     gray_tests = competing_risk_gray_tests,
+    gray_timepoints = competing_risk_gray_timepoints,
     relapse_summary = competing_risk_relapse_summary,
     death_summary = competing_risk_death_summary,
     smn_summary = competing_risk_smn_summary,

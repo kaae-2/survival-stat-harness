@@ -22,20 +22,29 @@ save_text <- function(lines, file_name) {
   writeLines(lines, file.path(out_dir, file_name))
 }
 
-extract_surv_summary <- function(fit, times) {
-  fit_summary <- summary(fit, times = times)
-  n_rows <- length(fit_summary$time)
+extract_prodlim_summary <- function(fit, times, cause = NULL) {
+  fit_summary <- if (is.null(cause)) {
+    summary(fit, times = times)
+  } else {
+    summary(fit, times = times, cause = cause)
+  }
+
+  as.data.frame(fit_summary)
+}
+
+extract_cuminc_timepoints <- function(fit, times) {
+  fit_timepoints <- cmprsk::timepoints(fit, times = times)
+  est_matrix <- fit_timepoints$est
+  var_matrix <- fit_timepoints$var
+  curves <- rownames(est_matrix)
+  time_values <- as.numeric(colnames(est_matrix))
 
   data.frame(
-    strata = if (is.null(fit_summary$strata)) rep("Overall", n_rows) else fit_summary$strata,
-    time = fit_summary$time,
-    n_risk = fit_summary$n.risk,
-    n_event = fit_summary$n.event,
-    n_censor = fit_summary$n.censor,
-    surv = fit_summary$surv,
-    std_err = fit_summary$std.err,
-    lower = fit_summary$lower,
-    upper = fit_summary$upper
+    curve = rep(curves, each = length(time_values)),
+    time = rep(time_values, times = length(curves)),
+    estimate = as.vector(t(est_matrix)),
+    variance = as.vector(t(var_matrix)),
+    std_err = sqrt(as.vector(t(var_matrix)))
   )
 }
 
@@ -75,14 +84,14 @@ extract_rmst_table <- function(fit, tau_days) {
 }
 
 fit_cause_specific_cox <- function(data, cause_code) {
-  cause_df <- dplyr::filter(
+  cause_df <- subset(
     data,
-    !is.na(compriskdays),
-    !is.na(comprisk),
-    !is.na(risk_grp),
-    !is.na(sex),
-    !is.na(age),
-    !is.na(log_lymf_count)
+    !is.na(compriskdays) &
+      !is.na(comprisk) &
+      !is.na(risk_grp) &
+      !is.na(sex) &
+      !is.na(age) &
+      !is.na(log_lymf_count)
   )
 
   survival::coxph(

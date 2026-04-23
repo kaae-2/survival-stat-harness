@@ -156,10 +156,11 @@ analysis_df$sct_by_landmark <- factor(
     survival::Surv(days, event) ~ risk_grp,
     data = overall_surv_df
   )
+  group_levels <- levels(overall_surv_df$risk_grp)
+  group_cols <- seq_along(group_levels)
 
-  analysis_helpers$save_plot_png("overall_km_by_risk_group.png", function() {
-    group_levels <- levels(overall_surv_df$risk_grp)
-    group_cols <- seq_along(group_levels)
+  analysis_helpers$save_plot_with_side_legend_png("figure_01_overall_event_free_survival_by_risk_group.png", function() {
+    graphics::par(mar = c(5.1, 4.1, 4.1, 2.1))
 
     graphics::plot(
       overall_surv_fit,
@@ -167,20 +168,21 @@ analysis_df$sct_by_landmark <- factor(
       lty = 1,
       xlab = "Days since diagnosis",
       ylab = "Event-free survival probability",
-      main = "Event-free survival by risk group"
+      main = "Event-Free Survival by Risk Group After Diagnosis"
     )
+  }, function() {
     graphics::legend(
-      "bottomleft",
+      "center",
       legend = group_levels,
       col = group_cols,
       lty = 1,
-      bty = "n"
+      bty = "n",
+      title = "Risk group"
     )
   })
 
-  analysis_helpers$save_plot_png("overall_cumulative_hazard_by_risk_group.png", function() {
-    group_levels <- levels(overall_surv_df$risk_grp)
-    group_cols <- seq_along(group_levels)
+  analysis_helpers$save_plot_with_side_legend_png("figure_02_overall_cumulative_hazard_by_risk_group.png", function() {
+    graphics::par(mar = c(5.1, 4.1, 4.1, 2.1))
 
     graphics::plot(
       overall_surv_fit,
@@ -189,14 +191,16 @@ analysis_df$sct_by_landmark <- factor(
       lty = 1,
       xlab = "Days since diagnosis",
       ylab = "Cumulative hazard",
-      main = "Cumulative hazard by risk group"
+      main = "Cumulative Event Hazard by Risk Group After Diagnosis"
     )
+  }, function() {
     graphics::legend(
-      "topleft",
+      "center",
       legend = group_levels,
       col = group_cols,
       lty = 1,
-      bty = "n"
+      bty = "n",
+      title = "Risk group"
     )
   })
 }
@@ -269,26 +273,50 @@ analysis_df$sct_by_landmark <- factor(
     prodlim::Hist(compriskdays, comprisk) ~ risk_grp,
     data = competing_risk_df
   )
+  group_levels <- levels(competing_risk_df$risk_grp)
+  group_cols <- seq_along(group_levels)
 
-  analysis_helpers$save_plot_png("competing_risk_cif_by_risk_group.png", function() {
-    graphics::par(mfrow = c(1, 2))
-
+  analysis_helpers$save_plot_with_side_legend_png("figure_03_competing_risk_cif_relapse_or_smn_by_risk_group.png", function() {
+    graphics::par(mar = c(5.1, 4.1, 4.1, 2.1))
     plot(
       competing_risk_cif_fit,
       cause = 1,
+      legend = FALSE,
       xlab = "Days since diagnosis",
-      ylab = "Cumulative incidence",
-      main = "Relapse or SMN"
+      ylab = "Cumulative incidence"
     )
+    graphics::title(main = "Cumulative Incidence of Relapse or SMN by Risk Group")
+  }, function() {
+    graphics::legend(
+      "center",
+      legend = group_levels,
+      lty = 1,
+      col = group_cols,
+      bty = "n",
+      title = "Risk group"
+    )
+  })
 
+  analysis_helpers$save_plot_with_side_legend_png("figure_04_competing_risk_cif_death_by_risk_group.png", function() {
+    graphics::par(mar = c(5.1, 4.1, 4.1, 2.1))
     plot(
       competing_risk_cif_fit,
       cause = 2,
+      legend = FALSE,
       xlab = "Days since diagnosis",
-      ylab = "Cumulative incidence",
-      main = "Death"
+      ylab = "Cumulative incidence"
     )
-  }, width = 1800, height = 900)
+    graphics::title(main = "Cumulative Incidence of Death by Risk Group")
+  }, function() {
+    graphics::legend(
+      "center",
+      legend = group_levels,
+      lty = 1,
+      col = group_cols,
+      bty = "n",
+      title = "Risk group"
+    )
+  })
 }
 
 # --- 1.2 landmark analysis for SCT ---
@@ -369,10 +397,11 @@ analysis_df$sct_by_landmark <- factor(
     survival::Surv(time_from_landmark, event_from_landmark) ~ sct_by_landmark,
     data = landmark_analysis_df
   )
+  sct_levels <- levels(landmark_analysis_df$sct_by_landmark)
+  sct_cols <- seq_along(sct_levels)
 
-  analysis_helpers$save_plot_png("landmark_km_by_sct_status.png", function() {
-    sct_levels <- levels(landmark_analysis_df$sct_by_landmark)
-    sct_cols <- seq_along(sct_levels)
+  analysis_helpers$save_plot_with_side_legend_png("figure_05_landmark_event_free_survival_by_sct_status.png", function() {
+    graphics::par(mar = c(5.1, 4.1, 4.1, 2.1))
 
     graphics::plot(
       landmark_km_fit,
@@ -380,14 +409,16 @@ analysis_df$sct_by_landmark <- factor(
       lty = 1,
       xlab = "Days since landmark",
       ylab = "Post-landmark event-free survival",
-      main = "Landmark analysis by SCT status"
+      main = "Post-Landmark Event-Free Survival by SCT Status"
     )
+  }, function() {
     graphics::legend(
-      "bottomleft",
+      "center",
       legend = sct_levels,
       col = sct_cols,
       lty = 1,
-      bty = "n"
+      bty = "n",
+      title = "SCT status"
     )
   })
 }
@@ -411,6 +442,10 @@ analysis_df$sct_by_landmark <- factor(
   rmst_tau_days <- min(5 * 365.25, max(rmst_overall_surv_df$days, na.rm = TRUE))
 
   overall_rmst_table <- analysis_helpers$extract_rmst_table(rmst_overall_surv_fit, rmst_tau_days)
+  overall_rmtl_table <- transform(
+    overall_rmst_table,
+    restricted_mean_time_lost = days_lost
+  )
   competing_risk_time_lost_relapse <- analysis_helpers$extract_time_lost_by_cause(
     rmst_competing_risk_df,
     rmst_tau_days,
@@ -429,6 +464,7 @@ analysis_df$sct_by_landmark <- factor(
   )
 
   analysis_helpers$save_csv(overall_rmst_table, "overall_rmst_table.csv")
+  analysis_helpers$save_csv(overall_rmtl_table, "overall_rmtl_table.csv")
   analysis_helpers$save_csv(competing_risk_time_lost_table, "competing_risk_time_lost_table.csv")
 }
 
@@ -442,10 +478,11 @@ analysis_df$sct_by_landmark <- factor(
     data = rmst_overall_surv_df
   )
   rmst_tau_days <- min(5 * 365.25, max(rmst_overall_surv_df$days, na.rm = TRUE))
+  group_levels <- levels(rmst_overall_surv_df$risk_grp)
+  group_cols <- seq_along(group_levels)
 
-  analysis_helpers$save_plot_png("overall_rmst_curves_by_risk_group.png", function() {
-    group_levels <- levels(rmst_overall_surv_df$risk_grp)
-    group_cols <- seq_along(group_levels)
+  analysis_helpers$save_plot_with_side_legend_png("figure_06_overall_rmst_survival_by_risk_group.png", function() {
+    graphics::par(mar = c(5.1, 4.1, 4.1, 2.1))
 
     graphics::plot(
       rmst_overall_surv_fit,
@@ -454,17 +491,89 @@ analysis_df$sct_by_landmark <- factor(
       xlab = "Days since diagnosis",
       ylab = "Event-free survival probability",
       xlim = c(0, rmst_tau_days),
-      main = "Event-free survival up to the RMST horizon"
+      main = "Event-Free Survival by Risk Group Up to the RMST Horizon"
     )
     graphics::abline(v = rmst_tau_days, lty = 2)
+  }, function() {
     graphics::legend(
-      "bottomleft",
+      "center",
       legend = group_levels,
       col = group_cols,
       lty = 1,
-      bty = "n"
+      bty = "n",
+      title = "Risk group"
     )
   })
+
+  overall_rmst_table <- analysis_helpers$extract_rmst_table(rmst_overall_surv_fit, rmst_tau_days)
+  overall_rmtl_values <- overall_rmst_table$days_lost
+  names(overall_rmtl_values) <- overall_rmst_table$group
+
+  analysis_helpers$save_plot_png("figure_07_overall_restricted_mean_time_lost_by_risk_group.png", function() {
+    graphics::par(mar = c(8.1, 4.1, 4.1, 2.1))
+    bar_cols <- seq_along(overall_rmtl_values)
+    bar_positions <- graphics::barplot(
+      overall_rmtl_values,
+      col = bar_cols,
+      las = 2,
+      ylab = "Days lost up to tau",
+      main = "Restricted Mean Time Lost by Risk Group"
+    )
+    graphics::abline(h = 0, lty = 1)
+    graphics::text(
+      x = bar_positions,
+      y = overall_rmtl_values,
+      labels = round(overall_rmtl_values, 1),
+      pos = 3,
+      cex = 0.8
+    )
+  }, width = 1800, height = 1200)
+
+  rmst_competing_risk_df <- subset(
+    analysis_df,
+    !is.na(compriskdays) & !is.na(comprisk) & !is.na(risk_grp)
+  )
+  competing_risk_time_lost_relapse <- analysis_helpers$extract_time_lost_by_cause(
+    rmst_competing_risk_df,
+    rmst_tau_days,
+    1,
+    "Relapse or SMN"
+  )
+  competing_risk_time_lost_death <- analysis_helpers$extract_time_lost_by_cause(
+    rmst_competing_risk_df,
+    rmst_tau_days,
+    2,
+    "Death"
+  )
+  competing_risk_time_lost_table <- rbind(
+    competing_risk_time_lost_relapse,
+    competing_risk_time_lost_death
+  )
+  competing_risk_rmtl_matrix <- xtabs(
+    restricted_mean_time_lost ~ cause + group,
+    data = competing_risk_time_lost_table
+  )
+  bar_cols <- c("steelblue", "firebrick")
+
+  analysis_helpers$save_plot_with_side_legend_png("figure_08_competing_risk_restricted_mean_time_lost_by_group_and_cause.png", function() {
+    graphics::par(mar = c(8.1, 4.1, 4.1, 2.1))
+    graphics::barplot(
+      competing_risk_rmtl_matrix,
+      beside = TRUE,
+      col = bar_cols,
+      las = 2,
+      ylab = "Days lost up to tau",
+      main = "Restricted Mean Time Lost by Risk Group and Cause"
+    )
+  }, function() {
+    graphics::legend(
+      "center",
+      legend = rownames(competing_risk_rmtl_matrix),
+      fill = bar_cols,
+      bty = "n",
+      title = "Cause"
+    )
+  }, width = 2200, height = 1200)
 }
 
 # --- 1.4 goodness-of-fit and model diagnostics ---
@@ -509,16 +618,16 @@ analysis_df$sct_by_landmark <- factor(
     data = diagnostics_model_df
   )
 
-  analysis_helpers$save_plot_png("overall_ph_gof.png", function() {
+  analysis_helpers$save_plot_png("figure_09_overall_ph_gof.png", function() {
     graphics::par(mfrow = grDevices::n2mfrow(length(stats::coef(overall_phreg_fit))))
     plot(overall_ph_gof)
   }, width = 2200, height = 1800)
 
-  analysis_helpers$save_plot_png("overall_age_linearity_gof.png", function() {
+  analysis_helpers$save_plot_png("figure_10_overall_age_linearity_gof.png", function() {
     plot(overall_age_linearity_gof, type = "z")
   }, width = 1400, height = 1000)
 
-  analysis_helpers$save_plot_png("overall_log_lymf_linearity_gof.png", function() {
+  analysis_helpers$save_plot_png("figure_11_overall_log_lymf_linearity_gof.png", function() {
     plot(overall_log_lymf_linearity_gof, type = "z")
   }, width = 1400, height = 1000)
 }
@@ -560,6 +669,7 @@ analysis_outputs <- list(
   rmst = list(
     tau_days = rmst_tau_days,
     overall_rmst_table = overall_rmst_table,
+    overall_rmtl_table = overall_rmtl_table,
     competing_risk_time_lost_relapse = competing_risk_time_lost_relapse,
     competing_risk_time_lost_death = competing_risk_time_lost_death,
     competing_risk_time_lost_table = competing_risk_time_lost_table

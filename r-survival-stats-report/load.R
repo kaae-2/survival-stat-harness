@@ -73,10 +73,10 @@ load_dataset <- function() {
     followdate = dplyr::case_when(
       lost_to_followup == 1 ~ lost_to_followup_date,
       !is.na(delayed_exclusion_date) ~ delayed_exclusion_date,
-      is.na(followup_active_date) ~ last_followup_date,
-      is.na(last_followup_date) ~ followup_active_date,
       followup_active_date > last_followup_date ~ followup_active_date,
-      TRUE ~ last_followup_date
+      !is.na(last_followup_date) ~ last_followup_date,
+      !is.na(followup_active_date) ~ followup_active_date,
+      TRUE ~ diagnosis_date + round(6 * 365.25)
     ),
     primary_event_days = dplyr::if_else(
       is.na(primary_event_date),
@@ -84,16 +84,19 @@ load_dataset <- function() {
       as.numeric(primary_event_date - diagnosis_date)
     ),
     event = dplyr::case_when(
+      is.na(primary_event_status) & !is.na(followdate) ~ 0,
       is.na(primary_event_status) ~ NA_real_,
       primary_event_status > 0 ~ 1,
       primary_event_status < 1 ~ 0
     ),
     relapse = dplyr::case_when(
+      is.na(primary_event_status) & !is.na(followdate) ~ 0,
       is.na(primary_event_status) ~ NA_real_,
       primary_event_status %in% c(3, 5) ~ 1,
       TRUE ~ 0
     ),
     comprisk = dplyr::case_when(
+      is.na(primary_event_status) & !is.na(followdate) ~ 0,
       is.na(primary_event_status) ~ NA_real_,
       primary_event_status < 1 ~ 0,
       primary_event_status %in% c(3, 5) ~ 1,

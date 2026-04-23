@@ -14,6 +14,35 @@ save_plot_png <- function(file_name, plot_code, width = 1600, height = 1200, res
   invisible(file.path(out_dir, file_name))
 }
 
+save_plot_with_side_legend_png <- function(
+  file_name,
+  plot_code,
+  legend_code,
+  width = 2000,
+  height = 1200,
+  res = 180,
+  layout_widths = c(4, 1)
+) {
+  grDevices::png(
+    filename = file.path(out_dir, file_name),
+    width = width,
+    height = height,
+    res = res
+  )
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  old_par <- graphics::par(no.readonly = TRUE)
+  on.exit(graphics::par(old_par), add = TRUE)
+
+  graphics::layout(matrix(c(1, 2), nrow = 1), widths = layout_widths)
+  plot_code()
+  graphics::par(mar = c(0, 0, 0, 0))
+  graphics::plot.new()
+  legend_code()
+
+  invisible(file.path(out_dir, file_name))
+}
+
 save_csv <- function(x, file_name) {
   utils::write.csv(x, file.path(out_dir, file_name), row.names = FALSE)
 }

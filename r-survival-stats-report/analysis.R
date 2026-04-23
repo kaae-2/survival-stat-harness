@@ -31,7 +31,7 @@
 # 2.4 Table of the different outcomes (hazard rates, confidence intervals, significance etc.)
 
 # --- setup / report scaffolding ---
-required_packages <- c("survival", "prodlim", "cmprsk", "mets")
+ required_packages <- c("haven", "survival", "prodlim", "cmprsk", "mets")
 missing_packages <- required_packages[
   !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
 ]
@@ -61,8 +61,8 @@ df <- pipeline_env$load_dataset()
 # Keep only the analysis-specific convenience variables that are used later.
 analysis_df <- transform(
   df,
-  sex = factor(sex),
-  risk_grp = factor(risk_grp),
+  sex = haven::as_factor(sex, levels = "labels"),
+  risk_grp = haven::as_factor(risk_grp, levels = "labels"),
   log_lymf_count = ifelse(is.na(lymf_count), NA_real_, log1p(pmax(lymf_count, 0))),
   sct_by_landmark = ifelse(
     is.na(landmark_date),
@@ -74,6 +74,7 @@ analysis_df$sct_by_landmark <- factor(
   analysis_df$sct_by_landmark,
   levels = c("No SCT by landmark", "SCT by landmark")
 )
+analysis_df <- droplevels(analysis_df)
 
 # --- 0.3 cohort summaries for the report ---
 {
@@ -108,11 +109,13 @@ analysis_df$sct_by_landmark <- factor(
     analysis_df,
     !is.na(days) & !is.na(event) & !is.na(risk_grp)
   )
+  overall_surv_df <- droplevels(overall_surv_df)
 
   overall_model_df <- subset(
     overall_surv_df,
     !is.na(sex) & !is.na(age) & !is.na(log_lymf_count)
   )
+  overall_model_df <- droplevels(overall_model_df)
 
   overall_report_times_days <- report_times_days[
     report_times_days <= max(overall_surv_df$days, na.rm = TRUE)
@@ -152,6 +155,7 @@ analysis_df$sct_by_landmark <- factor(
     analysis_df,
     !is.na(days) & !is.na(event) & !is.na(risk_grp)
   )
+  overall_surv_df <- droplevels(overall_surv_df)
   overall_surv_fit <- survival::survfit(
     survival::Surv(days, event) ~ risk_grp,
     data = overall_surv_df
@@ -214,6 +218,7 @@ analysis_df$sct_by_landmark <- factor(
     analysis_df,
     !is.na(compriskdays) & !is.na(comprisk) & !is.na(risk_grp)
   )
+  competing_risk_df <- droplevels(competing_risk_df)
 
   competing_risk_report_times_days <- report_times_days[
     report_times_days <= max(competing_risk_df$compriskdays, na.rm = TRUE)
@@ -269,6 +274,7 @@ analysis_df$sct_by_landmark <- factor(
     analysis_df,
     !is.na(compriskdays) & !is.na(comprisk) & !is.na(risk_grp)
   )
+  competing_risk_df <- droplevels(competing_risk_df)
   competing_risk_cif_fit <- prodlim::prodlim(
     prodlim::Hist(compriskdays, comprisk) ~ risk_grp,
     data = competing_risk_df
@@ -327,12 +333,14 @@ analysis_df$sct_by_landmark <- factor(
     analysis_df,
     !is.na(landmark_date) & !is.na(date) & !is.na(event) & !is.na(sct_by_landmark)
   )
+  landmark_source_df <- droplevels(landmark_source_df)
 
   landmark_analysis_df <- transform(
     subset(landmark_source_df, date > landmark_date),
     time_from_landmark = as.numeric(date - landmark_date),
     event_from_landmark = event
   )
+  landmark_analysis_df <- droplevels(landmark_analysis_df)
 
   landmark_group_counts <- data.frame(
     total_with_landmark_information = nrow(landmark_source_df),
@@ -388,11 +396,13 @@ analysis_df$sct_by_landmark <- factor(
     analysis_df,
     !is.na(landmark_date) & !is.na(date) & !is.na(event) & !is.na(sct_by_landmark)
   )
+  landmark_source_df <- droplevels(landmark_source_df)
   landmark_analysis_df <- transform(
     subset(landmark_source_df, date > landmark_date),
     time_from_landmark = as.numeric(date - landmark_date),
     event_from_landmark = event
   )
+  landmark_analysis_df <- droplevels(landmark_analysis_df)
   landmark_km_fit <- survival::survfit(
     survival::Surv(time_from_landmark, event_from_landmark) ~ sct_by_landmark,
     data = landmark_analysis_df
@@ -430,6 +440,7 @@ analysis_df$sct_by_landmark <- factor(
     analysis_df,
     !is.na(days) & !is.na(event) & !is.na(risk_grp)
   )
+  rmst_overall_surv_df <- droplevels(rmst_overall_surv_df)
   rmst_overall_surv_fit <- survival::survfit(
     survival::Surv(days, event) ~ risk_grp,
     data = rmst_overall_surv_df
@@ -438,6 +449,7 @@ analysis_df$sct_by_landmark <- factor(
     analysis_df,
     !is.na(compriskdays) & !is.na(comprisk) & !is.na(risk_grp)
   )
+  rmst_competing_risk_df <- droplevels(rmst_competing_risk_df)
 
   rmst_tau_days <- min(5 * 365.25, max(rmst_overall_surv_df$days, na.rm = TRUE))
 
@@ -473,6 +485,7 @@ analysis_df$sct_by_landmark <- factor(
     analysis_df,
     !is.na(days) & !is.na(event) & !is.na(risk_grp)
   )
+  rmst_overall_surv_df <- droplevels(rmst_overall_surv_df)
   rmst_overall_surv_fit <- survival::survfit(
     survival::Surv(days, event) ~ risk_grp,
     data = rmst_overall_surv_df
@@ -584,6 +597,7 @@ analysis_df$sct_by_landmark <- factor(
     analysis_df,
     !is.na(days) & !is.na(event) & !is.na(risk_grp) & !is.na(sex) & !is.na(age) & !is.na(log_lymf_count)
   )
+  diagnostics_model_df <- droplevels(diagnostics_model_df)
 
   overall_phreg_fit <- mets::phreg(
     survival::Surv(days, event) ~ risk_grp + sex + age + log_lymf_count,
@@ -607,6 +621,7 @@ analysis_df$sct_by_landmark <- factor(
     analysis_df,
     !is.na(days) & !is.na(event) & !is.na(risk_grp) & !is.na(sex) & !is.na(age) & !is.na(log_lymf_count)
   )
+  diagnostics_model_df <- droplevels(diagnostics_model_df)
   overall_phreg_fit <- mets::phreg(
     survival::Surv(days, event) ~ risk_grp + sex + age + log_lymf_count,
     data = diagnostics_model_df

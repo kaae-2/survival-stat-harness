@@ -151,25 +151,32 @@ extract_time_lost_by_cause <- function(data, tau_days, cause_code, cause_label) 
   Event <- mets::Event
   Surv <- survival::Surv
   cluster <- survival::cluster
-  cens_model <- ~ risk_grp
-  environment(cens_model) <- environment()
+  group_levels <- levels(droplevels(data$risk_grp))
 
-  fit <- mets::resmeanIPCW(
-    Event(compriskdays, comprisk) ~ -1 + risk_grp,
-    data = data,
-    time = tau_days,
-    cause = cause_code,
-    cens.model = cens_model,
-    model = "lin"
-  )
+  group_rows <- lapply(group_levels, function(group_level) {
+    group_data <- droplevels(subset(data, risk_grp == group_level))
+    cens_model <- ~1
+    environment(cens_model) <- environment()
 
-  fit_estimate <- mets::estimate(fit)
+    fit <- mets::resmeanIPCW(
+      Event(compriskdays, comprisk) ~ 1,
+      data = group_data,
+      time = tau_days,
+      cause = cause_code,
+      cens.model = cens_model,
+      model = "lin"
+    )
 
-  data.frame(
-    group = names(stats::coef(fit_estimate)),
-    cause = cause_label,
-    restricted_mean_time_lost = as.numeric(stats::coef(fit_estimate)),
-    tau_days = tau_days,
-    row.names = NULL
-  )
+    fit_estimate <- mets::estimate(fit)
+
+    data.frame(
+      group = as.character(group_level),
+      cause = cause_label,
+      restricted_mean_time_lost = as.numeric(stats::coef(fit_estimate))[1],
+      tau_days = tau_days,
+      row.names = NULL
+    )
+  })
+
+  do.call(rbind, group_rows)
 }

@@ -6,3 +6,4 @@
 *.csv
 unused.R
 */out/*
+*/data/*

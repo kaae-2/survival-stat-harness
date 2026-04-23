@@ -22,6 +22,23 @@ save_text <- function(lines, file_name) {
   writeLines(lines, file.path(out_dir, file_name))
 }
 
+extract_surv_summary <- function(fit, times) {
+  fit_summary <- summary(fit, times = times)
+  n_rows <- length(fit_summary$time)
+
+  data.frame(
+    strata = if (is.null(fit_summary$strata)) rep("Overall", n_rows) else fit_summary$strata,
+    time = fit_summary$time,
+    n_risk = fit_summary$n.risk,
+    n_event = fit_summary$n.event,
+    n_censor = fit_summary$n.censor,
+    surv = fit_summary$surv,
+    std_err = fit_summary$std.err,
+    lower = fit_summary$lower,
+    upper = fit_summary$upper
+  )
+}
+
 extract_prodlim_summary <- function(fit, times, cause = NULL) {
   fit_summary <- if (is.null(cause)) {
     summary(fit, times = times)
@@ -102,12 +119,18 @@ fit_cause_specific_cox <- function(data, cause_code) {
 }
 
 extract_time_lost_by_cause <- function(data, tau_days, cause_code, cause_label) {
+  Event <- mets::Event
+  Surv <- survival::Surv
+  cluster <- survival::cluster
+  cens_model <- ~ risk_grp
+  environment(cens_model) <- environment()
+
   fit <- mets::resmeanIPCW(
-    mets::Event(compriskdays, comprisk) ~ -1 + risk_grp,
+    Event(compriskdays, comprisk) ~ -1 + risk_grp,
     data = data,
     time = tau_days,
     cause = cause_code,
-    cens.model = ~ risk_grp,
+    cens.model = cens_model,
     model = "lin"
   )
 

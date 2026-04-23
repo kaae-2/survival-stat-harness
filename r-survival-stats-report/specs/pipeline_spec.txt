@@ -1,0 +1,102 @@
+Survival Stats Report Pipeline Specification
+
+Purpose
+
+This project loads two source SAV datasets, renames the required input columns via
+environment variables, derives a minimal survival-analysis dataset, and runs a
+set of report-oriented analyses.
+
+Main files
+
+- load_helpers.R
+  Reads required environment variables and renames source columns.
+
+- load.R
+  Reads the source data, validates the source headers against the correct source
+  dataset, joins the two source datasets by patient id, and derives the final
+  analysis variables.
+
+- analysis_helpers.R
+  Contains reusable helpers for saving outputs and extracting model summaries.
+
+- analysis.R
+  Loads the minimal dataset once, adds a small set of analysis-specific helper
+  variables, and runs the analysis blocks.
+
+Source data flow
+
+1. Read the main dataset from SAV_DATA_PATH.
+2. Read the date dataset from SAV_DATE_PATH.
+3. Build an in-memory header reference for data_df and date_df.
+4. Optionally write out/data_headers_reference.csv when WRITE_HEADER_REFERENCE=1.
+5. Rename only the required columns from each source dataset.
+6. Keep included patients only.
+7. Join the two datasets on id.
+
+Derived event logic
+
+- event
+  Binary event indicator.
+  1 if primary_event_status > 0.
+  0 if primary_event_status < 1.
+  0 if primary_event_status is missing and a follow-up date can be constructed.
+
+- relapse
+  Binary relapse-like endpoint.
+  1 if primary_event_status is 3 or 5.
+  0 otherwise, including censoring.
+
+- comprisk
+  Competing-risk status.
+  0 = censored / no registered event.
+  1 = relapse or SMN.
+  2 = death.
+
+Follow-up date logic
+
+followdate is defined in this order:
+
+1. lost_to_followup_date if lost_to_followup == 1
+2. delayed_exclusion_date if present
+3. the later of followup_active_date and last_followup_date
+4. whichever of followup_active_date or last_followup_date exists
+5. administrative censoring at diagnosis_date + 6 years if none of the above exist
+
+SCT logic
+
+- raw SCT date is coalesce(bmt1_date, trsct_date)
+- if SCT occurs after a relapse/SMN event, SCT is nulled out
+- timetosct is calculated from the final SCT date only
+
+Minimal output dataset from load.R
+
+- id
+- event
+- comprisk
+- sex
+- age
+- risk_grp
+- lymf_count
+- days
+- totaldays
+- compriskdays
+- date
+- relapse
+- timetosct
+- landmark_date
+- sct_date
+
+Analysis blocks in analysis.R
+
+1. Cohort summaries
+2. Overall event-free survival by risk group
+3. Competing-risks analysis for relapse/SMN and death
+4. Landmark analysis by SCT status at landmark
+5. Restricted mean survival time and restricted mean time lost
+6. Goodness-of-fit and proportionality / linearity diagnostics
+
+Output conventions
+
+- Tables are written to out/ as csv or txt files.
+- Figures are written to out/ with figure_XX_... filenames.
+- Each analysis section is written as a self-contained block that can be rerun in one pass.

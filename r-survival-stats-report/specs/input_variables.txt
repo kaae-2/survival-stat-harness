@@ -1,0 +1,144 @@
+Input Variables Used by the Pipeline
+
+This file lists the raw source variables used by the current pipeline and the
+general meaning of each variable in the analysis.
+
+Environment / configuration inputs
+
+- SAV_DATA_PATH
+  Path to the main SAV dataset.
+
+- SAV_DATE_PATH
+  Path to the date SAV dataset.
+
+- WRITE_HEADER_REFERENCE
+  If set to 1 / true / yes, writes out/data_headers_reference.csv.
+
+Raw variables read from the main dataset (data_df)
+
+- COL_ID -> id
+  Patient identifier used for joining datasets.
+
+- COL_INCLUDED -> included
+  Inclusion flag. Only included == 1 is kept.
+
+- COL_SEX -> sex
+  Patient sex.
+
+- COL_DATE_DIAGNOSIS -> diagnosis_date
+  Diagnosis date and time origin for all durations.
+
+- COL_AGE -> age
+  Age at diagnosis / baseline.
+
+- COL_RISK_GROUP -> risk_grp
+  Risk group used for stratified analyses.
+
+- COL_LYMF_COUNT -> lymf_count
+  Lymphocyte or related count used as a baseline covariate.
+
+- COL_DELAYED_EXCLUSION_DATE -> delayed_exclusion_date
+  Date used as a follow-up stop if present.
+
+Raw variables read from the date dataset (date_df)
+
+- COL_ID -> id
+  Patient identifier used for joining datasets.
+
+- COL_PRIMARY_EVENT_STATUS -> primary_event_status
+  Event coding used to define event, relapse, and competing-risk status.
+
+- COL_PRIMARY_EVENT_DATE -> primary_event_date
+  Date of first recorded event.
+
+- COL_FOLLOWUP_ACTIVE_DATE -> followup_active_date
+  Follow-up date candidate.
+
+- COL_LAST_FOLLOWUP_DATE -> last_followup_date
+  Last follow-up date candidate.
+
+- COL_LOST_TO_FOLLOWUP -> lost_to_followup
+  Indicator that follow-up ended due to loss to follow-up.
+
+- COL_LOST_TO_FOLLOWUP_DATE -> lost_to_followup_date
+  Date used when lost_to_followup == 1.
+
+- COL_LANDMARK_DATE -> landmark_date
+  Landmark date used for the SCT landmark analysis.
+
+- COL_TRSCT_DATE -> trsct_date
+  SCT / transplant date candidate.
+
+- COL_BMT1_DATE -> bmt1_date
+  SCT / transplant date candidate, preferred over trsct_date when present.
+
+Derived analysis variables used downstream
+
+- event
+  Binary event indicator for standard event-free survival.
+
+- comprisk
+  Competing-risk code.
+  0 = censored, 1 = relapse or SMN, 2 = death.
+
+- days
+  Time from diagnosis to event or censoring for event-free survival.
+
+- totaldays
+  Currently identical to days in the active pipeline.
+
+- compriskdays
+  Time from diagnosis to competing-risk event or censoring.
+
+- date
+  Event date or censoring date used in downstream landmark logic.
+
+- relapse
+  Binary indicator for relapse or SMN.
+
+- timetosct
+  Time from diagnosis to SCT, after the post-relapse/SMN SCT rule is applied.
+
+- sct_date
+  Final SCT date after applying the event-order rule.
+
+- log_lymf_count
+  Analysis-only transformed covariate created in analysis.R.
+
+- sct_by_landmark
+  Analysis-only grouping variable indicating SCT status by the landmark date.
+
+Primary model inputs in analysis.R
+
+Overall event-free survival:
+- days
+- event
+- risk_grp
+- sex
+- age
+- log_lymf_count
+
+Competing risks:
+- compriskdays
+- comprisk
+- risk_grp
+- sex
+- age
+- log_lymf_count
+
+Landmark analysis:
+- landmark_date
+- date
+- event
+- sct_date
+- risk_grp
+- sex
+- age
+- log_lymf_count
+
+Restricted mean analyses:
+- days
+- event
+- compriskdays
+- comprisk
+- risk_grp
